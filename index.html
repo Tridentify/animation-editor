@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Bloxd Animation Editor</title>
+    <link rel="icon" type="image/png" href="images/code-block.png">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <header>
+        <div id="title-bar">
+            <h1>Bloxd Animation Editor</h1>
+        </div>
+        <p>Create, preview and export Bloxd animations! Use WASD to navigate the 3D engine.</p>
+    </header>
+    <main>
+        <div id="workspace">
+            <div id="animation-container">
+                <canvas id="animation-canvas"></canvas>
+            </div>
+            <div id="keyframe-container">
+                <p><u>Animation Info</u></p>
+                <br>
+                <div id="keyframe-controls">
+                    <div id="animation-name-control">
+                        <label for="animation-name">Animation Name</label>
+                        <input type="text" id="animation-name" placeholder="Untitled Animation">
+                    </div>
+                    <div id="above-the-keyframe-bar">
+                        <label>Animation<br>Length</label>
+                        <input type="number" id="animation-length" min="0" max="10" value="10">
+                        <label>Lerp<br>Mode</label>
+                        <select id="lerpmode-select" name="Select a Lerp Mode type">
+                            <option value="linear">Linear</option>
+                            <option value="catmull-rom-spline">Smooth</option>
+                        </select>
+                        <label>Loop</label>
+                        <input type="checkbox" id="loop-mode">
+                        <label>Animation<br>Speed</label>
+                        <input type="number" id="animation-speed" min="1" max="5" value="1">
+                    </div>
+                    <div id="keyframe-bar">
+                        <div id="timeline-wrapper">
+                            <input type="range" id="timeline" min="0" max="10" value="0" step="any">
+                            <div id="keyframe-markers"></div>
+                        </div>
+                        <input type="number" id="timelineElapsed" value="0" readonly>
+                    </div>
+                    <div id="startStopButtons">
+                        <div id="timeline-controls">
+                            <button id="play-button">
+                                <img src="images/playbutton.png" alt="play button" class="startStopButtonIcons">
+                            </button>
+                            <button id="pause-button">
+                                <img src="images/pausebutton.png" alt="pause button" class="startStopButtonIcons">
+                            </button>
+                            <button id="restart-button">
+                                <img src="images/resbutton.png" alt="restart button" class="startStopButtonIcons">
+                            </button>
+                            <button id="forward-button">
+                                +2
+                            </button>
+                            <button id="back-button">
+                                -2
+                            </button>
+                        </div>
+                    </div>
+                    <div id="keyframeConfigure">
+                        <p id="keyframes-text">Keyframes</p>
+                        <button id="add-keyframe">
+                            Add
+                        </button>
+                        <button id="del-keyframe">
+                            Delete
+                        </button>
+                        <button id="des-keyframe">
+                            Deselect
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="controls">
+            <p>Nodes</p>
+            <div id="node-controls">
+                <button class="nodeButton" id="HeadMesh">Head</button>
+                <button class="nodeButton" id="TorsoNode">Torso</button>
+                <button class="nodeButton" id="ArmLeftMesh">Left Arm</button>
+                <button class="nodeButton" id="ArmRightMesh">Right Arm</button>
+                <button class="nodeButton" id="LegLeftMesh">Left Leg</button>
+                <button class="nodeButton" id="LegRightMesh">Right Leg</button>
+            </div>
+            <p id="selected-node-info">Selected Node: <span id="selected-node">Head</span></p>
+            <p class="control-panel">Rotation</p>
+            <div id="rotation-controls">
+                <div class="rotationAxis-control">
+                    <label for="xRotation">X</label>
+                    <input type="range" id="xRotation" min="-180" max="180" value="0">
+                    <input type="number" id="xRotationNumber" min="-180" max="180" value="0">
+                </div>
+                <div class="rotationAxis-control">
+                    <label for="yRotation">Y</label>
+                    <input type="range" id="yRotation" min="-180" max="180" value="0">
+                    <input type="number" id="yRotationNumber" min="-180" max="180" value="0">
+                </div>
+                <div class="rotationAxis-control">
+                    <label for="zRotation">Z</label>
+                    <input type="range" id="zRotation" min="-180" max="180" value="0">
+                    <input type="number" id="zRotationNumber" min="-180" max="180" value="0">
+                </div>
+            </div>
+            <p class="control-panel">Position</p>
+            <div id="position-controls">
+                <div class="positionAxis-control">
+                    <label for="xPosition">X</label>
+                    <input type="range" id="xPosition" min="-10" max="10" value="0" step="0.1">
+                    <input type="number" id="xPositionNumber" min="-10" max="10" value="0" step="0.1">
+                </div>
+                <div class="positionAxis-control">
+                    <label for="yPosition">Y</label>
+                    <input type="range" id="yPosition" min="-10" max="10" value="0" step="0.1">
+                    <input type="number" id="yPositionNumber" min="-10" max="10" value="0" step="0.1">
+                </div>
+                <div class="positionAxis-control">
+                    <label for="zPosition">Z</label>
+                    <input type="range" id="zPosition" min="-10" max="10" value="0" step="0.1">
+                    <input type="number" id="zPositionNumber" min="-10" max="10" value="0" step="0.1">
+                </div>
+            </div>
+            <br>
+            <div id="progressButtons">
+                <button id="reset-button" class="file-button">Reset</button>
+                <button id="export-button" class="file-button">Export Code</button>
+                <button id="export-json-button" class="file-button">Export File</button>
+                <button id="import-json-button" class="file-button">Import File</button>
+            </div>
+        </div>
+        <input type="file" id="import-file" accept=".bloxdmation" hidden>
+    </main>
+    <div id="code-saved-popup">
+        <div class="popup">
+            <h2><span id="success-popup-title">Code saved to clipboard.</span></h2>
+            <p><span id="success-popup-reason">Paste the code inside a Code Block to view the animation.</span></p>
+        </div>
+    </div>
+    <div id="code-saving-error-popup">
+        <div class="popup">
+            <h2><span id="error-popup-title">Code could not be saved.</span></h2>
+            <p><span id="error-popup-reason">Please try again.</span></p>
+        </div>
+    </div>
+    <footer>
+        <p>
+            <bold>
+                Created by Tridentify and Ocelote.
+                Made with assets from Bloxd.
+            </bold>
+        </p>
+    </footer>
+    <script type="module" src="script.js"></script>
+</body>
+
+</html>
