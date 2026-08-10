@@ -30,6 +30,7 @@ let modelParts = {
 }
 
 let mI = 15.5
+let round = (value) => Number(value.toFixed(4))
 
 Spatium.tick = () => {
     let torso = nodeData.TorsoNode
@@ -383,8 +384,8 @@ document.getElementById("export-button").onclick = async () => {
             let node = nodeData[nodeName]
             let timeline = [{
                 timeFraction: 0,
-                position: [node.position.x, node.position.y, -node.position.z],
-                rotation: [node.rotation.x * Math.PI / 180, node.rotation.y * Math.PI / 180, node.rotation.z * Math.PI / 180]
+                position: [round(node.position.x), round(node.position.y), round(-node.position.z)],
+                rotation: [round(node.rotation.x * Math.PI / 180), round(node.rotation.y * Math.PI / 180), round(node.rotation.z * Math.PI / 180)]
             }]
             console.log(node.rotation.x, node.rotation.y, node.rotation.z)
             let isDefault = node.position.x === 0 && node.position.y === 0 && node.position.z === 0 && node.rotation.x === 0 && node.rotation.y === 0 && node.rotation.z === 0
@@ -405,10 +406,10 @@ document.getElementById("export-button").onclick = async () => {
                 let positionChanged = !previousNode || node.position.x !== previousNode.position.x || node.position.y !== previousNode.position.y || node.position.z !== previousNode.position.z
                 let rotationChanged = !previousNode || node.rotation.x !== previousNode.rotation.x || node.rotation.y !== previousNode.rotation.y || node.rotation.z !== previousNode.rotation.z
                 if (positionChanged) {
-                    point.position = [node.position.x, node.position.y, -node.position.z]
+                    point.position = [round(node.position.x), round(node.position.y), round(-node.position.z)]
                 }
                 if (rotationChanged) {
-                    point.rotation = [node.rotation.x * Math.PI / 180, node.rotation.y * Math.PI / 180, node.rotation.z * Math.PI / 180]
+                    point.rotation = [round(node.rotation.x * Math.PI / 180), round(node.rotation.y * Math.PI / 180), round(node.rotation.z * Math.PI / 180)]
                 }
                 if (positionChanged || rotationChanged) {
                     timeline.push(point)
@@ -423,13 +424,21 @@ document.getElementById("export-button").onclick = async () => {
                     if (node.position.x !== firstNode.position.x || node.position.y !== firstNode.position.y || node.position.z !== firstNode.position.z || node.rotation.x !== firstNode.rotation.x || node.rotation.y !== firstNode.rotation.y || node.rotation.z !== firstNode.rotation.z) { hasChanged = true; break }
                 }
                 if (hasChanged) {
-                    if (lerp !== "none") {
-                        for (let point of timeline) {
-                            if (point.position) {
-                                point.position = { point: point.position, lerpMode: lerp }
+                    for (let point of timeline) {
+                        if (point.position) {
+                            if (point.position[0] === 0 && point.position[1] === 0 && point.position[2] === 0) {
+                                delete point.position
+                            } else if (lerp !== "linear") {
+                                point.position = {
+                                    point: point.position,
+                                    lerpMode: lerp
+                                }
                             }
-                            if (point.rotation) {
-                                point.rotation = { point: point.rotation, lerpMode: lerp }
+                        }
+                        if (point.rotation && lerp !== "linear") {
+                            point.rotation = {
+                                point: point.rotation,
+                                lerpMode: lerp
                             }
                         }
                     }
@@ -438,7 +447,7 @@ document.getElementById("export-button").onclick = async () => {
             }
         }
     }
-    let codeAboutToBeExported = "api.animateEntity(myId, " + JSON.stringify(animConfig, null, 2) + ", 0, " + animSpd + ")"
+    let codeAboutToBeExported = "api.animateEntity(myId, " + JSON.stringify(animConfig) + ", 0, " + animSpd + ")"
     try {
         await navigator.clipboard.writeText(codeAboutToBeExported)
         showPopup(true, "Code saved to clipboard.", "Paste the code into a Code Block to view the animation!")
@@ -602,4 +611,9 @@ let input = document.getElementById('animation-name')
 input.addEventListener('input', function () {
     console.log(1)
     this.value = this.value.replace(/[^a-zA-Z_0-9 ]/g, '')
+})
+
+window.addEventListener("beforeunload", event => {
+    event.preventDefault()
+    event.returnValue = ""
 })
