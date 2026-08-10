@@ -460,33 +460,36 @@ var importAnimationCode = (code) => {
                 }
                 let animation = config.nodeAnimations[nodeName]
                 if (!animation?.timeline) continue
-                let previous = null
+                let currentPosition = { x: 0, y: 0, z: 0 }
+                let currentRotation = { x: 0, y: 0, z: 0 }
+
                 for (let point of animation.timeline) {
                     let pointTime = point.timeFraction * animationLength
-
-                    if (pointTime <= time) {
-                        previous = point
-                    } else {
-                        break
+                    if (pointTime > time) break
+                    if (point.position) {
+                        let position = point.position.point || point.position
+                        currentPosition = {
+                            x: Number(position[0] ?? 0),
+                            y: Number(position[1] ?? 0),
+                            z: -Number(position[2] ?? 0)
+                        }
+                    }
+                    if (point.rotation) {
+                        let rotation = point.rotation.point || point.rotation
+                        currentRotation = {
+                            x: Number(rotation[0] ?? 0) * 180 / Math.PI,
+                            y: Number(rotation[1] ?? 0) * 180 / Math.PI,
+                            z: Number(rotation[2] ?? 0) * 180 / Math.PI
+                        }
                     }
                 }
-                if (!previous) continue
-                if (previous.position) {
-                    let position = previous.position.point || previous.position
-                    data[nodeName].position.x = Number(position[0] ?? 0)
-                    data[nodeName].position.y = Number(position[1] ?? 0)
-                    data[nodeName].position.z = -Number(position[2] ?? 0)
-                }
-                if (previous.rotation) {
-                    let rotation = previous.rotation.point || previous.rotation
-                    data[nodeName].rotation.x = Number(rotation[0] ?? 0) * 180 / Math.PI
-                    data[nodeName].rotation.y = Number(rotation[1] ?? 0) * 180 / Math.PI
-                    data[nodeName].rotation.z = Number(rotation[2] ?? 0) * 180 / Math.PI
-                }
+                data[nodeName] = { position: currentPosition, rotation: currentRotation }
             }
             keyframes.push({ time: Number(time.toFixed(4)), data })
         }
         selectedKeyframe = null
+        selectedNode = "HeadMesh"
+        document.getElementById("selected-node").textContent = "Head"
         keyframes.sort((a, b) => a.time - b.time)
         timeline.value = 0
         timelineElapsed.value = "0.0"
@@ -793,10 +796,10 @@ input.addEventListener('input', function () {
     this.value = this.value.replace(/[^a-zA-Z_0-9 ]/g, '')
 })
 
-/*window.addEventListener("beforeunload", event => {
+window.addEventListener("beforeunload", event => {
     event.preventDefault()
     event.returnValue = ""
-})*/
+})
 
 document.getElementById("import-code-button").onclick = () => {
     showPopup(true, "Import Animation Code", "Paste your api.animateEntity code below.", "", true)
