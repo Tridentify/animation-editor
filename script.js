@@ -423,23 +423,19 @@ document.getElementById("export-button").onclick = async () => {
                     let firstNode = firstData[nodeName]
                     if (node.position.x !== firstNode.position.x || node.position.y !== firstNode.position.y || node.position.z !== firstNode.position.z || node.rotation.x !== firstNode.rotation.x || node.rotation.y !== firstNode.rotation.y || node.rotation.z !== firstNode.rotation.z) { hasChanged = true; break }
                 }
-                if (hasChanged) {
+                let firstNode = firstData[nodeName]
+                let firstIsDefault = firstNode.position.x === 0 && firstNode.position.y === 0 && firstNode.position.z === 0 && firstNode.rotation.x === 0 && firstNode.rotation.y === 0 && firstNode.rotation.z === 0
+                if (hasChanged || !firstIsDefault) {
                     for (let point of timeline) {
                         if (point.position) {
                             if (point.position[0] === 0 && point.position[1] === 0 && point.position[2] === 0) {
                                 delete point.position
-                            } else if (lerp !== "linear") {
-                                point.position = {
-                                    point: point.position,
-                                    lerpMode: lerp
-                                }
+                            } else if (lerp === "catmull-rom-spline") {
+                                point.position = { point: point.position, lerpMode: lerp }
                             }
                         }
-                        if (point.rotation && lerp !== "linear") {
-                            point.rotation = {
-                                point: point.rotation,
-                                lerpMode: lerp
-                            }
+                        if (point.rotation && lerp === "catmull-rom-spline") {
+                            point.rotation = { point: point.rotation, lerpMode: lerp }
                         }
                     }
                     animConfig.nodeAnimations[nodeName] = { timeline }
