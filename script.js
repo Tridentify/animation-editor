@@ -484,7 +484,7 @@ var importAnimationCode = (code) => {
                     data[nodeName].rotation.z = Number(rotation[2] ?? 0) * 180 / Math.PI
                 }
             }
-            keyframes.push({time: Number(time.toFixed(4)), data})
+            keyframes.push({ time: Number(time.toFixed(4)), data })
         }
         selectedKeyframe = null
         keyframes.sort((a, b) => a.time - b.time)
@@ -495,7 +495,7 @@ var importAnimationCode = (code) => {
             loadNodeData()
         }
         updateKeyframeMarkers()
-        setTimeout(() => {showPopup(true, "Code imported.", "The code animation has been imported successfully.")}, 0)
+        setTimeout(() => { showPopup(true, "Code imported.", "The code animation has been imported successfully.") }, 0)
     } catch (error) {
         console.error(error)
         showPopup(false, "Could not import code.", "Please try again.")
