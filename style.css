@@ -328,7 +328,7 @@ input[type="number"] {
     margin: 5px 13px 0;
     text-align: center;
     text-decoration: none;
-    font-size: 1.4rem;
+    font-size: 1.3rem;
 }
 
 #keyframe-bar {
@@ -725,5 +725,5 @@ input[type="checkbox"]:checked:hover {
 }
 
 .control-panel {
-    margin-top: 20px !important;
+    margin-top: 10px !important;
 }

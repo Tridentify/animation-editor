@@ -3,19 +3,19 @@ import Spatium from "./engine/Spatium.js"
 Spatium.canvas = document.getElementById("animation-canvas")
 
 let modelParts = {
-    LegLeftMesh: {
+    LegRightMesh: {
         faces: Spatium.mesh.create.cuboid([-4, 0, -2], [0, 12, 2], { fill: "lime", width: 1 }),
         pivot: [-2, 12, 0]
     },
-    LegRightMesh: {
+    LegLeftMesh: {
         faces: Spatium.mesh.create.cuboid([0, 0, -2], [4, 12, 2], { fill: "lime", width: 1 }),
         pivot: [2, 12, 0]
     },
-    ArmLeftMesh: {
+    ArmRightMesh: {
         faces: Spatium.mesh.create.cuboid([-8, 12, -2], [-4, 24, 2], { fill: "blue", width: 1 }),
         pivot: [-4, 24, 0]
     },
-    ArmRightMesh: {
+    ArmLeftMesh: {
         faces: Spatium.mesh.create.cuboid([4, 12, -2], [8, 24, 2], { fill: "blue", width: 1 }),
         pivot: [4, 24, 0]
     },
@@ -29,6 +29,8 @@ let modelParts = {
     }
 }
 
+let mI = 15.5
+
 Spatium.tick = () => {
     let torso = nodeData.TorsoNode
     let objects = []
@@ -37,11 +39,11 @@ Spatium.tick = () => {
         let node = nodeData[nodeName]
 
         let faces = Spatium.mesh.transform.rotate(part.faces, node.rotation.x * Math.PI / 180, node.rotation.y * Math.PI / 180, node.rotation.z * Math.PI / 180, ...part.pivot)
-        faces = Spatium.mesh.transform.translate(faces, node.position.x * 14, node.position.y * 14, node.position.z * 14)
+        faces = Spatium.mesh.transform.translate(faces, node.position.x * mI, node.position.y * mI, node.position.z * mI)
         if (nodeName === "HeadMesh" || nodeName === "ArmLeftMesh" || nodeName === "ArmRightMesh") {
             faces = Spatium.mesh.transform.rotate(faces, torso.rotation.x * Math.PI / 180, torso.rotation.y * Math.PI / 180, torso.rotation.z * Math.PI / 180, 0, 12, 0)
 
-            faces = Spatium.mesh.transform.translate(faces, torso.position.x * 14, torso.position.y * 14, torso.position.z * 14)
+            faces = Spatium.mesh.transform.translate(faces, torso.position.x * mI, torso.position.y * mI, torso.position.z * mI)
         }
         objects.push(faces)
     }
@@ -138,6 +140,18 @@ document.querySelectorAll('input[type="range"]').forEach(slider => {
     let no = document.getElementById(slider.id + "Number")
     if (!no) return
     slider.addEventListener('input', function () {
+        if (slider.id === "xRotation" || slider.id === "yRotation" || slider.id === "zRotation") {
+            let value = Number(slider.value)
+            let snapPoints = [0, 90, -90]
+            for (let snap of snapPoints) {
+                if (Math.abs(value - snap) <= 6) {
+                    value = snap
+                    slider.value = value
+                    no.value = value
+                    break
+                }
+            }
+        }
         no.value = slider.value
         if (slider.id === "xRotation")
             nodeData[selectedNode].rotation.x = Number(slider.value)
@@ -145,6 +159,19 @@ document.querySelectorAll('input[type="range"]').forEach(slider => {
             nodeData[selectedNode].rotation.y = Number(slider.value)
         if (slider.id === "zRotation")
             nodeData[selectedNode].rotation.z = Number(slider.value)
+
+        if (slider.id === "xPosition" || slider.id === "yPosition" || slider.id === "zPosition") {
+            let value = Number(slider.value)
+            let snapPoints = [0, 5, -5]
+            for (let snap of snapPoints) {
+                if (Math.abs(value - snap) <= 0.3) {
+                    value = snap
+                    slider.value = value
+                    no.value = value
+                    break
+                }
+            }
+        }
         if (slider.id === "xPosition")
             nodeData[selectedNode].position.x = Number(slider.value)
         if (slider.id === "yPosition")
@@ -223,10 +250,16 @@ var updateModelAtTime = (time) => {
         newData[nodeName].position.x = a.position.x + (b.position.x - a.position.x) * t
         newData[nodeName].position.y = a.position.y + (b.position.y - a.position.y) * t
         newData[nodeName].position.z = a.position.z + (b.position.z - a.position.z) * t
-
-        newData[nodeName].rotation.x = a.rotation.x + (b.rotation.x - a.rotation.x) * t
-        newData[nodeName].rotation.y = a.rotation.y + (b.rotation.y - a.rotation.y) * t
-        newData[nodeName].rotation.z = a.rotation.z + (b.rotation.z - a.rotation.z) * t
+        var angleLerp = (a, b, t) => {
+            if (Math.abs(a - b) === 360) {
+                b = a
+            }
+            let delta = ((b - a + 180) % 360) - 180
+            return a + delta * t
+        }
+        newData[nodeName].rotation.x = angleLerp(a.rotation.x, b.rotation.x, t)
+        newData[nodeName].rotation.y = angleLerp(a.rotation.y, b.rotation.y, t)
+        newData[nodeName].rotation.z = angleLerp(a.rotation.z, b.rotation.z, t)
     }
     nodeData = newData
     loadNodeData()
@@ -291,7 +324,7 @@ var animate = (time) => {
         if (!lastTime) lastTime = time
         let lf = (time - lastTime) / 1000
         lastTime = time
-        let speed = 1
+        let speed = Number(document.getElementById("animation-speed").value)
         timeline.value = Math.min(Number(timeline.value) + speed * lf, Number(timeline.max))
         timelineElapsed.value = Number(timeline.value).toFixed(1)
         if (keyframes.length > 0) {
@@ -350,7 +383,7 @@ document.getElementById("export-button").onclick = async () => {
             let node = nodeData[nodeName]
             let timeline = [{
                 timeFraction: 0,
-                position: [node.position.x, node.position.y, node.position.z],
+                position: [node.position.x, node.position.y, -node.position.z],
                 rotation: [node.rotation.x * Math.PI / 180, node.rotation.y * Math.PI / 180, node.rotation.z * Math.PI / 180]
             }]
             console.log(node.rotation.x, node.rotation.y, node.rotation.z)
@@ -372,7 +405,7 @@ document.getElementById("export-button").onclick = async () => {
                 let positionChanged = !previousNode || node.position.x !== previousNode.position.x || node.position.y !== previousNode.position.y || node.position.z !== previousNode.position.z
                 let rotationChanged = !previousNode || node.rotation.x !== previousNode.rotation.x || node.rotation.y !== previousNode.rotation.y || node.rotation.z !== previousNode.rotation.z
                 if (positionChanged) {
-                    point.position = [node.position.x, node.position.y, node.position.z]
+                    point.position = [node.position.x, node.position.y, -node.position.z]
                 }
                 if (rotationChanged) {
                     point.rotation = [node.rotation.x * Math.PI / 180, node.rotation.y * Math.PI / 180, node.rotation.z * Math.PI / 180]
@@ -461,7 +494,7 @@ document.getElementById("reset-button").onclick = () => {
     updateKeyframeMarkers()
     Spatium.camZ = -50
     Spatium.camY = 16
-    Spatium.camX = 37
+    Spatium.camX = 35
     Spatium.camRotYRad = Math.PI / 5
     document.getElementById("animation-name").value = ""
 }
@@ -491,13 +524,18 @@ document.getElementById("code-saving-error-popup").addEventListener("click", eve
     }
 })
 
+let currentVersion = 3
+
 document.getElementById("export-json-button").onclick = () => {
     let data = {
         format: "bloxdmation",
-        version: 2,
+        version: currentVersion,
         animationLength: Number(document.getElementById("animation-length").value),
         loop: document.getElementById("loop-mode").checked,
-        keyframes: keyframes
+        keyframes: keyframes,
+        speed: Number(document.getElementById("animation-speed").value),
+        name: document.getElementById("animation-name").value || "Untitled Animation",
+        lerp: document.getElementById("lerpmode-select").value
     }
     let json = JSON.stringify(data)
     let base64 = btoa(unescape(encodeURIComponent(json)))
@@ -531,7 +569,7 @@ document.getElementById("import-file").onchange = (event) => {
                 showPopup(false, "Invalid file type.", "Only .bloxdmation files are supported.")
                 return
             }
-            if (data.version !== 1) {
+            if (data.version !== currentVersion) {//replace this with currentVersion
                 showPopup(false, "Outdated file version.", "This .bloxdmation file is outdated.")
                 return
             }
@@ -540,6 +578,9 @@ document.getElementById("import-file").onchange = (event) => {
             document.getElementById("animation-length").value = data.animationLength
             timeline.max = data.animationLength
             document.getElementById("loop-mode").checked = data.loop
+            document.getElementById("animation-name").value = data.name
+            document.getElementById("animation-speed").value = data.speed
+            document.getElementById("lerpmode-select").value = data.lerp
             updateKeyframeMarkers()
             if (keyframes.length > 0) {
                 timeline.value = keyframes[0].time
@@ -556,3 +597,9 @@ document.getElementById("import-file").onchange = (event) => {
 document.getElementById("import-json-button").onclick = () => {
     document.getElementById("import-file").click()
 }
+
+let input = document.getElementById('animation-name')
+input.addEventListener('input', function () {
+    console.log(1)
+    this.value = this.value.replace(/[^a-zA-Z_0-9 ]/g, '')
+})
