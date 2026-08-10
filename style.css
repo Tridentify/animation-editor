@@ -6,6 +6,15 @@
     font-style: normal;
 }
 
+@font-face {
+    font-family: "BPdotsBold";
+    src: url("./fonts/BPdotsBold.otf") format("opentype");
+    font-weight: normal;
+    font-style: normal;
+}
+
+
+
 html {
     height: 100%;
 }
@@ -70,10 +79,10 @@ button:active {
 
 #controls {
     width: 330px;
-    padding: 15px;
+    padding: 10px;
     margin: 0;
-    font-size: 1.6rem;
-    line-height: 1.1;
+    font-size: 1.8rem;
+    line-height: 1;
     background-color: #ddfcff;
     box-sizing: border-box;
     overflow-y: auto;
@@ -107,13 +116,13 @@ main {
 
 #controls p {
     margin: 0;
-    font-size: 0.7em;
+    font-size: 0.65em;
     text-decoration: underline;
 }
 
 #node-controls {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 3px;
 }
 
@@ -139,11 +148,11 @@ button.selected {
 .rotationAxis-control,
 .positionAxis-control {
     display: grid;
-    grid-template-columns: 20px 1fr 55px;
+    grid-template-columns: 18px 1fr 65px;
     align-items: center;
-    gap: 8px;
-    font-size: 1.2rem;
-    margin-bottom: 6px;
+    gap: 5px;
+    font-size: 1.05rem;
+    margin-bottom: 3px;
 }
 
 input[type="range"] {
@@ -258,6 +267,20 @@ input[type="number"] {
     box-shadow: 1.7px 1.7px 0 #1f1f1f;
 }
 
+#import-code-button {
+    background: #ffc342;
+    color: #000;
+    border: 2px solid #000;
+    box-shadow: 1.7px 1.7px 0 #1f1f1f;
+}
+
+#import-base64-button {
+    background: #7bffae;
+    color: #000;
+    border: 2px solid #000;
+    box-shadow: 1.7px 1.7px 0 #1f1f1f;
+}
+
 #export-json-button {
     background: #f3a7ff;
     color: #000;
@@ -280,8 +303,16 @@ input[type="number"] {
     background: #fff29d;
 }
 
+#import-code-button:hover {
+    background: #ffda8b;
+}
+
 #export-json-button:hover {
     background: #f7c2ff;
+}
+
+#import-base64-button:hover {
+    background: #b4ffd1;
 }
 
 #import-json-button:hover {
@@ -292,7 +323,7 @@ input[type="number"] {
     background: #f44747;
 }
 
-#export-button:active {
+#import-code-button:active {
     background: #efd738;
 }
 
@@ -302,6 +333,14 @@ input[type="number"] {
 
 #import-json-button:active {
     background: #5c89f1;
+}
+
+#import-code-button:active {
+    background: #f1b636;
+}
+
+#import-base64-button:active {
+    background: #54e78c;
 }
 
 #workspace {
@@ -545,12 +584,20 @@ input[type="number"] {
     background-color: #ff8bb2 !important;
 }
 
+#des-keyframe:hover {
+    background-color: #90d3ff !important;
+}
+
 #add-keyframe:active {
     background-color: #96df3e !important;
 }
 
 #del-keyframe:active {
     background-color: #e14c7e !important;
+}
+
+#des-keyframe:active {
+    background-color: #49a9ea !important;
 }
 
 #keyframe-controls #above-the-keyframe-bar {
@@ -644,13 +691,13 @@ select option {
 
 #progressButtons {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 3px;
     margin-top: auto;
 }
 
 #progressButtons button {
-    height: 40px;
+    height: 60px;
 }
 
 #bigspacefrfr {
@@ -725,5 +772,36 @@ input[type="checkbox"]:checked:hover {
 }
 
 .control-panel {
-    margin-top: 10px !important;
+    margin-top: 5px !important;
+}
+
+.popup-code {
+    margin-top: 15px;
+    width: 100%;
+}
+
+.popup-code-text {
+    display: block;
+    width: 100%;
+    height: 180px;
+    box-sizing: border-box;
+    resize: none;
+    overflow: auto;
+    padding: 10px;
+    background: #f6f6f6;
+    color: #000;
+    border: 2px solid #dcdcdc;
+    font-family: monospace;
+    font-size: 0.7rem;
+    text-align: left;
+    white-space: pre;
+    font-weight: 900;
+    outline: none;
+}
+
+.popup-code button {
+    width: auto;
+    margin-top: 8px;
+    background-color: #fbf5a6;
+    color: #000;
 }

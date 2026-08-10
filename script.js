@@ -125,15 +125,50 @@ for (let button of buttons) {
     })
 }
 
-var showPopup = (success, title, reason) => {
+var showPopup = (success, title, reason, code = null, input = false, inputType = "code") => {
+    let popup = document.getElementById(success ? "code-saved-popup" : "code-saving-error-popup")
+    let popupContent = popup.querySelector(".popup")
+    let oldCode = popupContent.querySelector(".popup-code")
+    if (oldCode) oldCode.remove()
+    if (code !== null) {
+        let codeContainer = document.createElement("div")
+        codeContainer.className = "popup-code"
+        let codeText = document.createElement("textarea")
+        codeText.className = "popup-code-text"
+        codeText.value = code
+        codeText.readOnly = !input
+        codeContainer.appendChild(codeText)
+        if (!input) {
+            let selectButton = document.createElement("button")
+            selectButton.textContent = "Select All"
+            selectButton.onclick = () => {
+                codeText.focus()
+                codeText.select()
+            }
+            codeContainer.appendChild(selectButton)
+        } else {
+            let importButton = document.createElement("button")
+            importButton.textContent = "Import"
+            importButton.onclick = () => {
+                if (inputType === "base64") {
+                    importBase64(codeText.value)
+                } else {
+                    importAnimationCode(codeText.value)
+                }
+                popup.style.display = "none"
+            }
+            codeContainer.appendChild(importButton)
+        }
+        popupContent.appendChild(codeContainer)
+    }
     if (success) {
         document.getElementById("success-popup-title").textContent = title
         document.getElementById("success-popup-reason").textContent = reason
-        document.getElementById("code-saved-popup").style.display = "flex"
+        popup.style.display = "flex"
     } else {
         document.getElementById("error-popup-title").textContent = title
         document.getElementById("error-popup-reason").textContent = reason
-        document.getElementById("code-saving-error-popup").style.display = "flex"
+        popup.style.display = "flex"
     }
 }
 
@@ -165,7 +200,7 @@ document.querySelectorAll('input[type="range"]').forEach(slider => {
             let value = Number(slider.value)
             let snapPoints = [0, 5, -5]
             for (let snap of snapPoints) {
-                if (Math.abs(value - snap) <= 0.3) {
+                if (Math.abs(value - snap) <= 0.4) {
                     value = snap
                     slider.value = value
                     no.value = value
@@ -320,6 +355,153 @@ document.getElementById("des-keyframe").onclick = () => {
     updateKeyframeMarkers()
 }
 
+var importBase64 = (base64) => {
+    try {
+        base64 = base64.trim()
+        let json = decodeURIComponent(escape(atob(base64)))
+        let data = JSON.parse(json)
+        if (data.format !== "bloxdmation") {
+            showPopup(false, "Invalid file type.", "Only valid .bloxdmation Base64 data is supported.")
+            return
+        }
+        if (data.version !== currentVersion) {
+            showPopup(false, "Outdated file version.", "This .bloxdmation file is outdated.")
+            return
+        }
+        keyframes = data.keyframes || []
+        selectedKeyframe = null
+        document.getElementById("animation-length").value = data.animationLength
+        timeline.max = data.animationLength
+        document.getElementById("loop-mode").checked = data.loop
+        document.getElementById("animation-name").value = data.name || "Untitled Animation"
+        document.getElementById("animation-speed").value = data.speed ?? 1
+        document.getElementById("lerpmode-select").value = data.lerp || "linear"
+        if (keyframes.length > 0) {
+            keyframes.sort((a, b) => a.time - b.time)
+            nodeData = structuredClone(keyframes[0].data)
+            timeline.value = keyframes[0].time
+            timelineElapsed.value = keyframes[0].time.toFixed(1)
+            loadNodeData()
+        } else {
+            nodeData = {
+                HeadMesh: {
+                    position: { x: 0, y: 0, z: 0 },
+                    rotation: { x: 0, y: 0, z: 0 }
+                },
+                TorsoNode: {
+                    position: { x: 0, y: 0, z: 0 },
+                    rotation: { x: 0, y: 0, z: 0 }
+                },
+                ArmLeftMesh: {
+                    position: { x: 0, y: 0, z: 0 },
+                    rotation: { x: 0, y: 0, z: 0 }
+                },
+                ArmRightMesh: {
+                    position: { x: 0, y: 0, z: 0 },
+                    rotation: { x: 0, y: 0, z: 0 }
+                },
+                LegLeftMesh: {
+                    position: { x: 0, y: 0, z: 0 },
+                    rotation: { x: 0, y: 0, z: 0 }
+                },
+                LegRightMesh: {
+                    position: { x: 0, y: 0, z: 0 },
+                    rotation: { x: 0, y: 0, z: 0 }
+                }
+            }
+            timeline.value = 0
+            timelineElapsed.value = "0.0"
+            loadNodeData()
+        }
+        updateKeyframeMarkers()
+        showPopup(true, "Base64 string imported.", "The Base64 animation has been imported successfully.")
+    } catch (error) {
+        console.error(error)
+        showPopup(false, "Could not import Base64 string.", "The Base64 data is either invalid or corrupted.")
+    }
+}
+
+var importAnimationCode = (code) => {
+    try {
+        code = code.trim()
+        let match = code.match(/api\.animateEntity\s*\(\s*[^,]+,\s*([\s\S]*),\s*([^,]+),\s*([^)]+)\s*\)\s*;?\s*$/)
+        if (!match) {
+            showPopup(false, "Invalid code.", "The code provided is invalid.")
+            return
+        }
+        let config = JSON.parse(match[1])
+        let animSpeed = Number(match[3])
+        if (!config.animationDurationMs || !config.nodeAnimations) {
+            showPopup(false, "Invalid code.", "The code does not contain a valid animation configuration.")
+            return
+        }
+        let animationLength = config.animationDurationMs / 1000
+        document.getElementById("animation-length").value = animationLength
+        document.getElementById("animation-speed").value = animSpeed
+        timeline.max = animationLength
+        document.getElementById("loop-mode").checked = config.loop ?? false
+        keyframes = []
+        let nodes = Object.keys(nodeData)
+        let times = new Set([0])
+        for (let nodeName of nodes) {
+            let animation = config.nodeAnimations[nodeName]
+            if (!animation?.timeline) continue
+
+            for (let point of animation.timeline) {
+                times.add(point.timeFraction * animationLength)
+            }
+        }
+        for (let time of [...times].sort((a, b) => a - b)) {
+            let data = {}
+            for (let nodeName of nodes) {
+                data[nodeName] = {
+                    position: { x: 0, y: 0, z: 0 },
+                    rotation: { x: 0, y: 0, z: 0 }
+                }
+                let animation = config.nodeAnimations[nodeName]
+                if (!animation?.timeline) continue
+                let previous = null
+                for (let point of animation.timeline) {
+                    let pointTime = point.timeFraction * animationLength
+
+                    if (pointTime <= time) {
+                        previous = point
+                    } else {
+                        break
+                    }
+                }
+                if (!previous) continue
+                if (previous.position) {
+                    let position = previous.position.point || previous.position
+                    data[nodeName].position.x = Number(position[0] ?? 0)
+                    data[nodeName].position.y = Number(position[1] ?? 0)
+                    data[nodeName].position.z = -Number(position[2] ?? 0)
+                }
+                if (previous.rotation) {
+                    let rotation = previous.rotation.point || previous.rotation
+                    data[nodeName].rotation.x = Number(rotation[0] ?? 0) * 180 / Math.PI
+                    data[nodeName].rotation.y = Number(rotation[1] ?? 0) * 180 / Math.PI
+                    data[nodeName].rotation.z = Number(rotation[2] ?? 0) * 180 / Math.PI
+                }
+            }
+            keyframes.push({time: Number(time.toFixed(4)), data})
+        }
+        selectedKeyframe = null
+        keyframes.sort((a, b) => a.time - b.time)
+        timeline.value = 0
+        timelineElapsed.value = "0.0"
+        if (keyframes.length > 0) {
+            nodeData = structuredClone(keyframes[0].data)
+            loadNodeData()
+        }
+        updateKeyframeMarkers()
+        setTimeout(() => {showPopup(true, "Code imported.", "The code animation has been imported successfully.")}, 0)
+    } catch (error) {
+        console.error(error)
+        showPopup(false, "Could not import code.", "Please try again.")
+    }
+}
+
 var animate = (time) => {
     if (isPlaying) {
         if (!lastTime) lastTime = time
@@ -443,10 +625,10 @@ document.getElementById("export-button").onclick = async () => {
             }
         }
     }
-    let codeAboutToBeExported = "api.animateEntity(myId, " + JSON.stringify(animConfig) + ", 0, " + animSpd + ")"
+    let codeAboutToBeExported = "api.animateEntity(myId, " + JSON.stringify(animConfig, null, 2) + ", 0, " + animSpd + ")"
     try {
         await navigator.clipboard.writeText(codeAboutToBeExported)
-        showPopup(true, "Code saved to clipboard.", "Paste the code into a Code Block to view the animation!")
+        showPopup(true, "Code saved to clipboard.", "Paste the code into a Code Block to view the animation! Code contents can also be copied below.", codeAboutToBeExported)
         //document.getElementById("code-saved-popup").style.display = "flex"
         //alert("Code saved to clipboard.\nPaste it in a Code Block to view the animation!")
     } catch (error) {
@@ -553,7 +735,7 @@ document.getElementById("export-json-button").onclick = () => {
     a.click()
     a.remove()
     URL.revokeObjectURL(url)
-    showPopup(true, "Animation file saved.", "Your .bloxdmation file (" + (document.getElementById("animation-name").value || "Untitled Animation") + ") has been successfully saved locally.")
+    showPopup(true, "Animation file saved.", "Your .bloxdmation file (" + (document.getElementById("animation-name").value || "Untitled Animation") + ") has been successfully saved locally. File contents can be copied below.", base64)
 }
 
 document.getElementById("import-file").onchange = (event) => {
@@ -586,12 +768,14 @@ document.getElementById("import-file").onchange = (event) => {
             document.getElementById("animation-name").value = data.name
             document.getElementById("animation-speed").value = data.speed
             document.getElementById("lerpmode-select").value = data.lerp
-            updateKeyframeMarkers()
             if (keyframes.length > 0) {
+                keyframes.sort((a, b) => a.time - b.time)
+                nodeData = structuredClone(keyframes[0].data)
                 timeline.value = keyframes[0].time
                 timelineElapsed.value = keyframes[0].time.toFixed(1)
-                updateModelAtTime(keyframes[0].time)
+                loadNodeData()
             }
+            updateKeyframeMarkers()
             showPopup(true, "File loaded.", "Your file has successfully been loaded into the animator!")
         } catch (error) {
             showPopup(false, "Could not load file.", "This file type is unsupported or its contents are corrupted.")
@@ -609,7 +793,15 @@ input.addEventListener('input', function () {
     this.value = this.value.replace(/[^a-zA-Z_0-9 ]/g, '')
 })
 
-window.addEventListener("beforeunload", event => {
+/*window.addEventListener("beforeunload", event => {
     event.preventDefault()
     event.returnValue = ""
-})
+})*/
+
+document.getElementById("import-code-button").onclick = () => {
+    showPopup(true, "Import Animation Code", "Paste your api.animateEntity code below.", "", true)
+}
+
+document.getElementById("import-base64-button").onclick = () => {
+    showPopup(true, "Import Base64", "Paste your Base64 data below.", "", true)
+}
