@@ -664,6 +664,18 @@ select option {
     background-color: #deffa1;
 }
 
+.bobub {
+    width: 400px;
+    padding: 25px;
+    border: 3px solid #000;
+    box-shadow: 5px 5px 0 #1f1f1f;
+    text-align: center;
+    font-family: "Jersey", sans-serif;
+    font-size: 1.5rem;
+    box-sizing: border-box;
+    background-color: #cbe5ff;
+}
+
 #code-saved-popup {
     display: none;
     position: fixed;
@@ -800,9 +812,69 @@ input[type="checkbox"]:checked:hover {
     outline: none;
 }
 
-.popup-code button {
-    width: auto;
+.popup-code-buttons {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
     margin-top: 8px;
-    background-color: #fbf5a6;
+}
+
+.popup-code button,
+.popup-code-buttons button {
+    width: auto;
+    margin-top: 15px;
+    background: #fff29d;
     color: #000;
+}
+
+.popup-code button:hover,
+.popup-code-buttons button:hover {
+    background: #fffad9;
+}
+
+.popup-code button:active,
+.popup-code-buttons button:active {
+    background: #ffe855;
+}
+
+.popup-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.popup-buttons button {
+    padding: 8px 16px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 1.3rem;
+}
+
+.cancel-reset {
+    background: #f5f5f5;
+    color: #111;
+    border: 2px solid #111;
+}
+
+.confirm-reset {
+    background: #ff5454;
+    color: #fff;
+    border: 2px solid #111;
+}
+
+.confirm-reset:hover {
+    background: #fe8585;
+}
+
+.confirm-reset:active {
+    background: #f44747;
+}
+
+.cancel-reset:hover {
+    background: #ededed;
+}
+
+.cancel-reset:active {
+    background: #dedede;
 }

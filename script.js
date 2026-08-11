@@ -125,6 +125,162 @@ for (let button of buttons) {
     })
 }
 
+function genSegmentedCode() {
+    let sortedKeyframes = [...keyframes].sort((a, b) => a.time - b.time)
+    if (sortedKeyframes.length <= 6) {
+        return null
+    }
+    let speed = Number(document.getElementById("animation-speed").value)
+    let loop = document.getElementById("loop-mode").checked
+    let maxKeyframes = 5
+    let segments = []
+    for (let i = 0; i < sortedKeyframes.length; i += maxKeyframes - 1) {
+        let segment = sortedKeyframes.slice(i, i + maxKeyframes)
+        segments.push(segment)
+    }
+    let segmentCodes = []
+    for (let i = 0; i < segments.length; i++) {
+        let segment = segments[i]
+        let startTime = segment[0].time
+        let endTime = segment[segment.length - 1].time
+        let duration = endTime - startTime
+        let nodeAnimations = {}
+        for (let nodeName of Object.keys(nodeData)) {
+            let timeline = []
+            let previousNode = null
+            for (let keyframe of segment) {
+                let node = keyframe.data[nodeName]
+                if (!node) continue
+                let positionChanged = !previousNode || node.position.x !== previousNode.position.x || node.position.y !== previousNode.position.y || node.position.z !== previousNode.position.z
+                let rotationChanged = !previousNode || node.rotation.x !== previousNode.rotation.x || node.rotation.y !== previousNode.rotation.y || node.rotation.z !== previousNode.rotation.z
+                if (positionChanged || rotationChanged) {
+                    let point = {
+                        timeFraction: duration === 0 ? 0 : Number(((keyframe.time - startTime) / duration).toFixed(6))
+                    }
+                    if (positionChanged) {
+                        point.position = [round(node.position.x), round(node.position.y), round(-node.position.z)]
+                    }
+                    if (rotationChanged) {
+                        point.rotation = [round(node.rotation.x * Math.PI / 180), round(node.rotation.y * Math.PI / 180), round(node.rotation.z * Math.PI / 180)]
+                    }
+                    timeline.push(point)
+                }
+                previousNode = node
+            }
+            if (timeline.length > 0) {
+                nodeAnimations[nodeName] = { timeline }
+            }
+        }
+        let config = { animationDurationMs: Math.max(1, Math.round(duration * 1000)), loop: i === segments.length - 1 ? loop : false, nodeAnimations }
+        segmentCodes.push({ startTime, duration, config })
+    }
+
+    let worldCode = `animationQueue = {}
+animationQueueId = 0
+
+function addAnimation(animation, delay = 0, speed = 1) {
+    animationQueueId++
+    animationQueue[animationQueueId] = {
+        animation,
+        delay,
+        speed
+    }
+    return "" + animationQueueId
+}
+
+tick = () => {
+    for (let q in animationQueue) {
+        if (api.isNearInterrupt()) break
+
+        let qData = animationQueue[q]
+
+        if (qData.delay > 50) {
+            qData.delay -= 50
+        } else {
+            try {
+                qData.animation(qData.speed)
+            } catch (error) {}
+            delete animationQueue[q]
+        }
+    }
+}`
+    let first = segmentCodes[0]
+    let firstCode = "let playerId = myId\n" + "api.animateEntity(playerId, " + JSON.stringify(first.config) + ", 0, " + speed + ")"
+    let codeBlockCode = firstCode
+    for (let i = 1; i < segmentCodes.length; i++) {
+        let segment = segmentCodes[i]
+        let delay = Math.round(segment.startTime * 1000 / speed)
+        let configString = JSON.stringify(segment.config)
+        codeBlockCode += "\n\naddAnimation((speed) => {" + "\n    api.animateEntity(playerId, " + configString + ", 0, speed)" + "\n}, " + delay + ", " + speed + ")"
+    }
+    return { worldCode, codeBlockCode }
+}
+
+function showSegmentedExportPopup(worldCode, codeBlockCode) {
+    let overlay = document.createElement("div")
+    overlay.style.position = "fixed"
+    overlay.style.inset = "0"
+    overlay.style.background = "rgba(0, 0, 0, 0.45)"
+    overlay.style.display = "flex"
+    overlay.style.alignItems = "center"
+    overlay.style.justifyContent = "center"
+    overlay.style.zIndex = "1000"
+    let popup = document.createElement("div")
+    popup.className = "popup"
+    popup.style.width = "700px"
+    popup.style.maxHeight = "90vh"
+    popup.style.overflowY = "auto"
+    popup.innerHTML =
+        "<h2>Animation split into segments</h2>" +
+        "<p>This animation has too many keyframes! It has been split into multiple segments.</p>" +
+        "<h3>World Code</h3>" +
+        "<p>Paste this in your World Code. (Press F8 to open)</p>" +
+        "<textarea class=\"popup-code-text\" readonly></textarea>" +
+        "<div class=\"popup-code-buttons\">" +
+        "<button class=\"select-code\">Select All</button>" +
+        "<button class=\"copy-code\">Copy Code</button>" +
+        "</div>" +
+        "<h3>Code Block</h3>" +
+        "<p>Paste this in a Code Block.</p>" +
+        "<textarea class=\"popup-code-text\" readonly></textarea>" +
+        "<div class=\"popup-code-buttons\">" +
+        "<button class=\"select-code\">Select All</button>" +
+        "<button class=\"copy-code\">Copy Code</button>" +
+        "</div>"
+    let textareas = popup.querySelectorAll(".popup-code-text")
+    let selectButtons = popup.querySelectorAll(".select-code")
+    let copyButtons = popup.querySelectorAll(".copy-code")
+    textareas[0].value = worldCode
+    textareas[1].value = codeBlockCode
+    selectButtons.forEach((button, index) => {
+        button.onclick = () => {
+            textareas[index].focus()
+            textareas[index].select()
+        }
+    })
+    copyButtons.forEach((button, index) => {
+        button.onclick = async () => {
+            try {
+                await navigator.clipboard.writeText(textareas[index].value)
+                button.textContent = "Copied!"
+                setTimeout(() => {
+                    button.textContent = "Copy Code"
+                }, 1000)
+            } catch (error) {
+                textareas[index].focus()
+                textareas[index].select()
+            }
+        }
+    })
+    overlay.appendChild(popup)
+    overlay.addEventListener("click", event => {
+        if (event.target === overlay) {
+            overlay.remove()
+        }
+    })
+    document.body.appendChild(overlay)
+}
+
 var showPopup = (success, title, reason, code = null, input = false, inputType = "code") => {
     let popup = document.getElementById(success ? "code-saved-popup" : "code-saving-error-popup")
     let popupContent = popup.querySelector(".popup")
@@ -414,7 +570,13 @@ var importBase64 = (base64) => {
             loadNodeData()
         }
         updateKeyframeMarkers()
-        showPopup(true, "Base64 string imported.", "The Base64 animation has been imported successfully.")
+        setTimeout(() => {
+            showPopup(
+                true,
+                "Base64 string imported.",
+                "The Base64 animation has been imported successfully."
+            )
+        }, 0)
     } catch (error) {
         console.error(error)
         showPopup(false, "Could not import Base64 string.", "The Base64 data is either invalid or corrupted.")
@@ -424,71 +586,169 @@ var importBase64 = (base64) => {
 var importAnimationCode = (code) => {
     try {
         code = code.trim()
-        let match = code.match(/api\.animateEntity\s*\(\s*[^,]+,\s*([\s\S]*),\s*([^,]+),\s*([^)]+)\s*\)\s*;?\s*$/)
-        if (!match) {
-            showPopup(false, "Invalid code.", "The code provided is invalid.")
+        let animations = []
+        let animateRegex = /api\.animateEntity\s*\(\s*[^,]+,\s*/g
+        let match
+        while ((match = animateRegex.exec(code)) !== null) {
+            let jsonStart = animateRegex.lastIndex
+            let depth = 0
+            let inString = false
+            let escaped = false
+            let jsonEnd = -1
+            for (let i = jsonStart; i < code.length; i++) {
+                let char = code[i]
+                if (inString) {
+                    if (escaped) {
+                        escaped = false
+                    } else if (char === "\\") {
+                        escaped = true
+                    } else if (char === '"') {
+                        inString = false
+                    }
+                    continue
+                }
+                if (char === '"') {
+                    inString = true
+                    continue
+                }
+                if (char === "{") {
+                    depth++
+                } else if (char === "}") {
+                    depth--
+                    if (depth === 0) {
+                        jsonEnd = i + 1
+                        break
+                    }
+                }
+            }
+            if (jsonEnd === -1) {
+                showPopup(false, "Invalid code.", "Could not read animation configuration.")
+                return
+            }
+            let configString = code.slice(jsonStart, jsonEnd)
+            let config = JSON.parse(configString)
+            let afterConfig = code.slice(jsonEnd)
+            let speedMatch = afterConfig.match(/^\s*,\s*0\s*,\s*([^)]+)\)/)
+            let speed = speedMatch ? Number(speedMatch[1].trim()) : 1
+            let delay = 0
+            let beforeAnimation = code.slice(0, match.index)
+            let addAnimationMatch = beforeAnimation.match(/addAnimation\s*\(\s*\(speed\)\s*=>\s*\{\s*$/)
+            if (addAnimationMatch) {
+                let addAnimationEnd = code.indexOf(")", jsonEnd)
+                let remaining = code.slice(jsonEnd)
+                let closingMatch = remaining.match(/^\s*,\s*0\s*,\s*[^)]+\)\s*\}\s*,\s*([0-9.+-]+)\s*,/)
+                if (closingMatch) {
+                    delay = Number(closingMatch[1])
+                }
+            }
+            animations.push({ config, delay, speed })
+        }
+        if (animations.length === 0) {
+            showPopup(false, "Invalid code.", "No api.animateEntity animation code was found.")
             return
         }
-        let config = JSON.parse(match[1])
-        let animSpeed = Number(match[3])
-        if (!config.animationDurationMs || !config.nodeAnimations) {
-            showPopup(false, "Invalid code.", "The code does not contain a valid animation configuration.")
-            return
+        let firstSpeed = animations[0].speed || 1
+        document.getElementById("animation-speed").value = firstSpeed
+        let absoluteAnimations = []
+        let currentStart = 0
+        for (let i = 0; i < animations.length; i++) {
+            let animation = animations[i]
+            let config = animation.config
+            if (!config.animationDurationMs || !config.nodeAnimations) {
+                showPopup(false, "Invalid code.", "The animation code is invalid.")
+                return
+            }
+            if (i === 0) {
+                currentStart = 0
+            } else {
+                currentStart = animation.delay / 1000 * firstSpeed - 0.001
+            }
+            let duration = config.animationDurationMs / 1000
+            absoluteAnimations.push({
+                config,
+                startTime: currentStart,
+                duration
+            })
         }
-        let animationLength = config.animationDurationMs / 1000
+
+        let animationLength = 0
+        for (let animation of absoluteAnimations) {
+            let endTime = animation.startTime + animation.duration
+            animationLength = Math.max(animationLength, endTime)
+        }
+        animationLength = Number(animationLength.toFixed(4))
         document.getElementById("animation-length").value = animationLength
-        document.getElementById("animation-speed").value = animSpeed
         timeline.max = animationLength
-        document.getElementById("loop-mode").checked = config.loop ?? false
+        let lastConfig = absoluteAnimations[absoluteAnimations.length - 1].config
+        document.getElementById("loop-mode").checked = lastConfig.loop ?? false
         keyframes = []
         let nodes = Object.keys(nodeData)
         let times = new Set([0])
-        for (let nodeName of nodes) {
-            let animation = config.nodeAnimations[nodeName]
-            if (!animation?.timeline) continue
+        for (let animation of absoluteAnimations) {
+            for (let nodeName of nodes) {
+                let nodeAnimation = animation.config.nodeAnimations[nodeName]
+                if (!nodeAnimation?.timeline) continue
 
-            for (let point of animation.timeline) {
-                times.add(point.timeFraction * animationLength)
+                for (let point of nodeAnimation.timeline) {
+                    let absoluteTime =
+                        animation.startTime +
+                        point.timeFraction * animation.duration
+
+                    times.add(Number(absoluteTime.toFixed(6)))
+                }
             }
         }
-        for (let time of [...times].sort((a, b) => a - b)) {
+
+        let sortedTimes = [...times].sort((a, b) => a - b)
+        for (let time of sortedTimes) {
             let data = {}
             for (let nodeName of nodes) {
                 data[nodeName] = {
                     position: { x: 0, y: 0, z: 0 },
                     rotation: { x: 0, y: 0, z: 0 }
                 }
-                let animation = config.nodeAnimations[nodeName]
-                if (!animation?.timeline) continue
                 let currentPosition = { x: 0, y: 0, z: 0 }
                 let currentRotation = { x: 0, y: 0, z: 0 }
-
-                for (let point of animation.timeline) {
-                    let pointTime = point.timeFraction * animationLength
-                    if (pointTime > time) break
-                    if (point.position) {
-                        let position = point.position.point || point.position
-                        currentPosition = {
-                            x: Number(position[0] ?? 0),
-                            y: Number(position[1] ?? 0),
-                            z: -Number(position[2] ?? 0)
+                for (let animation of absoluteAnimations) {
+                    let nodeAnimation = animation.config.nodeAnimations[nodeName]
+                    if (!nodeAnimation?.timeline) continue
+                    let localTime = time - animation.startTime
+                    if (localTime < 0) continue
+                    let localFraction = animation.duration === 0 ? 0 : localTime / animation.duration
+                    for (let point of nodeAnimation.timeline) {
+                        if (point.timeFraction > localFraction) break
+                        if (point.position) {
+                            let position = point.position.point || point.position
+                            currentPosition = {
+                                x: Number(position[0] ?? 0),
+                                y: Number(position[1] ?? 0),
+                                z: -Number(position[2] ?? 0)
+                            }
                         }
-                    }
-                    if (point.rotation) {
-                        let rotation = point.rotation.point || point.rotation
-                        currentRotation = {
-                            x: Number(rotation[0] ?? 0) * 180 / Math.PI,
-                            y: Number(rotation[1] ?? 0) * 180 / Math.PI,
-                            z: Number(rotation[2] ?? 0) * 180 / Math.PI
+                        if (point.rotation) {
+                            let rotation = point.rotation.point || point.rotation
+                            currentRotation = {
+                                x: Number(rotation[0] ?? 0) * 180 / Math.PI,
+                                y: Number(rotation[1] ?? 0) * 180 / Math.PI,
+                                z: Number(rotation[2] ?? 0) * 180 / Math.PI
+                            }
                         }
                     }
                 }
-                data[nodeName] = { position: currentPosition, rotation: currentRotation }
+                data[nodeName] = {
+                    position: currentPosition,
+                    rotation: currentRotation
+                }
             }
-            keyframes.push({ time: Number(time.toFixed(4)), data })
+            keyframes.push({
+                time: Number(time.toFixed(4)),
+                data
+            })
         }
         selectedKeyframe = null
         selectedNode = "HeadMesh"
+        buttons.forEach(btn => btn.classList.remove("selected"))
+        buttons[0].classList.add("selected")
         document.getElementById("selected-node").textContent = "Head"
         keyframes.sort((a, b) => a.time - b.time)
         timeline.value = 0
@@ -498,7 +758,13 @@ var importAnimationCode = (code) => {
             loadNodeData()
         }
         updateKeyframeMarkers()
-        setTimeout(() => { showPopup(true, "Code imported.", "The code animation has been imported successfully.") }, 0)
+        setTimeout(() => {
+            showPopup(
+                true,
+                "Code imported.",
+                "The code animation has been imported successfully."
+            )
+        }, 0)
     } catch (error) {
         console.error(error)
         showPopup(false, "Could not import code.", "Please try again.")
@@ -555,6 +821,14 @@ document.getElementById("forward-button").onclick = () => {
 }
 
 document.getElementById("export-button").onclick = async () => {
+    let segmented = genSegmentedCode()
+    if (segmented) {
+        showSegmentedExportPopup(segmented.worldCode, segmented.codeBlockCode)
+        return
+    }
+
+
+    //continue
     let animL = Number(document.getElementById("animation-length").value)
     let lerp = document.getElementById("lerpmode-select").value
     let loop = document.getElementById("loop-mode").checked
@@ -628,7 +902,7 @@ document.getElementById("export-button").onclick = async () => {
             }
         }
     }
-    let codeAboutToBeExported = "api.animateEntity(myId, " + JSON.stringify(animConfig, null, 2) + ", 0, " + animSpd + ")"
+    let codeAboutToBeExported = "api.animateEntity(myId, " + JSON.stringify(animConfig) + ", 0, " + animSpd + ")"
     try {
         await navigator.clipboard.writeText(codeAboutToBeExported)
         showPopup(true, "Code saved to clipboard.", "Paste the code into a Code Block to view the animation! Code contents can also be copied below.", codeAboutToBeExported)
@@ -639,54 +913,85 @@ document.getElementById("export-button").onclick = async () => {
     }
 }
 
-document.getElementById("reset-button").onclick = () => {
-    nodeData = {
-        HeadMesh: {
-            position: { x: 0, y: 0, z: 0 },
-            rotation: { x: 0, y: 0, z: 0 }
-        },
-        TorsoNode: {
-            position: { x: 0, y: 0, z: 0 },
-            rotation: { x: 0, y: 0, z: 0 }
-        },
-        ArmLeftMesh: {
-            position: { x: 0, y: 0, z: 0 },
-            rotation: { x: 0, y: 0, z: 0 }
-        },
-        ArmRightMesh: {
-            position: { x: 0, y: 0, z: 0 },
-            rotation: { x: 0, y: 0, z: 0 }
-        },
-        LegLeftMesh: {
-            position: { x: 0, y: 0, z: 0 },
-            rotation: { x: 0, y: 0, z: 0 }
-        },
-        LegRightMesh: {
-            position: { x: 0, y: 0, z: 0 },
-            rotation: { x: 0, y: 0, z: 0 }
-        }
+function showResConf() {
+    let overlay = document.createElement("div")
+    overlay.className = "reset-confirm-overlay"
+    overlay.style.position = "fixed"
+    overlay.style.inset = "0"
+    overlay.style.background = "rgba(0, 0, 0, 0.45)"
+    overlay.style.display = "flex"
+    overlay.style.alignItems = "center"
+    overlay.style.justifyContent = "center"
+    overlay.style.zIndex = "1001"
+
+    let popup = document.createElement("div")
+    popup.className = "popup bobub"
+    popup.style.width = "500px"
+    popup.innerHTML = "<h2>Reset animation?</h2>" + "<p>Are you sure you want to reset the animation? All changes will be lost.</p>" + "<div class=\"popup-buttons\">" + "<button class=\"cancel-reset\">Cancel</button>" + "<button class=\"confirm-reset\">Reset</button>" + "</div>"
+    popup.querySelector(".cancel-reset").onclick = () => {
+        overlay.remove()
     }
-    keyframes = []
-    selectedKeyframe = null
-    isPlaying = false
-    lastTime = 0
-    timeline.value = timeline.min
-    timelineElapsed.value = Number(timeline.min).toFixed(1)
-    document.getElementById("animation-length").value = 10
-    timeline.max = 10
-    document.getElementById("loop-mode").checked = false
-    document.getElementById("lerpmode-select").value = "linear"
-    buttons.forEach(btn => btn.classList.remove("selected"))
-    buttons[0].classList.add("selected")
-    selectedNode = buttons[0].id
-    selectedNodeSpan.textContent = buttons[0].id
-    loadNodeData()
-    updateKeyframeMarkers()
-    Spatium.camZ = -50
-    Spatium.camY = 16
-    Spatium.camX = 35
-    Spatium.camRotYRad = Math.PI / 5
-    document.getElementById("animation-name").value = ""
+    popup.querySelector(".confirm-reset").onclick = () => {
+        overlay.remove()
+        nodeData = {
+            HeadMesh: {
+                position: { x: 0, y: 0, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 }
+            },
+            TorsoNode: {
+                position: { x: 0, y: 0, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 }
+            },
+            ArmLeftMesh: {
+                position: { x: 0, y: 0, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 }
+            },
+            ArmRightMesh: {
+                position: { x: 0, y: 0, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 }
+            },
+            LegLeftMesh: {
+                position: { x: 0, y: 0, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 }
+            },
+            LegRightMesh: {
+                position: { x: 0, y: 0, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 }
+            }
+        }
+        keyframes = []
+        selectedKeyframe = null
+        isPlaying = false
+        lastTime = 0
+        timeline.value = timeline.min
+        timelineElapsed.value = Number(timeline.min).toFixed(1)
+        document.getElementById("animation-length").value = 10
+        timeline.max = 10
+        document.getElementById("loop-mode").checked = false
+        document.getElementById("lerpmode-select").value = "linear"
+        buttons.forEach(btn => btn.classList.remove("selected"))
+        buttons[0].classList.add("selected")
+        selectedNode = buttons[0].id
+        selectedNodeSpan.textContent = buttons[0].id
+        loadNodeData()
+        updateKeyframeMarkers()
+        Spatium.camZ = -50
+        Spatium.camY = 16
+        Spatium.camX = 35
+        Spatium.camRotYRad = Math.PI / 5
+        document.getElementById("animation-name").value = ""
+    }
+    overlay.addEventListener("click", event => {
+        if (event.target === overlay) {
+            overlay.remove()
+        }
+    })
+    overlay.appendChild(popup)
+    document.body.appendChild(overlay)
+}
+
+document.getElementById("reset-button").onclick = () => {
+    showResConf()
 }
 
 document.getElementById("animation-length").addEventListener("input", e => {
@@ -796,15 +1101,15 @@ input.addEventListener('input', function () {
     this.value = this.value.replace(/[^a-zA-Z_0-9 ]/g, '')
 })
 
-window.addEventListener("beforeunload", event => {
+/*window.addEventListener("beforeunload", event => {
     event.preventDefault()
     event.returnValue = ""
-})
+})*/
 
 document.getElementById("import-code-button").onclick = () => {
     showPopup(true, "Import Animation Code", "Paste your api.animateEntity code below.", "", true)
 }
 
 document.getElementById("import-base64-button").onclick = () => {
-    showPopup(true, "Import Base64", "Paste your Base64 data below.", "", true)
+    showPopup(true, "Import Base64", "Paste your Base64 data below.", "", true, "base64")
 }
