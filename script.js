@@ -1188,10 +1188,10 @@ input.addEventListener('input', function () {
     this.value = this.value.replace(/[^a-zA-Z_0-9 ]/g, '')
 })
 
-/*window.addEventListener("beforeunload", event => {
+window.addEventListener("beforeunload", event => {
     event.preventDefault()
     event.returnValue = ""
-})*/
+})
 
 document.getElementById("import-code-button").onclick = () => {
     showPopup(true, "Import Animation Code", "Paste your api.animateEntity code below.", "", true)
