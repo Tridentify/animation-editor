@@ -807,9 +807,11 @@ input[type="checkbox"]:checked:hover {
     font-family: monospace;
     font-size: 0.7rem;
     text-align: left;
-    white-space: pre;
+    white-space: pre-wrap;
     font-weight: 900;
     outline: none;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 .popup-code-buttons {

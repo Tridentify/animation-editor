@@ -126,13 +126,14 @@ for (let button of buttons) {
 }
 
 function genSegmentedCode() {
+    let maxKeyframes = 8
     let sortedKeyframes = [...keyframes].sort((a, b) => a.time - b.time)
-    if (sortedKeyframes.length <= 6) {
+    if (sortedKeyframes.length <= maxKeyframes) {
         return null
     }
     let speed = Number(document.getElementById("animation-speed").value)
     let loop = document.getElementById("loop-mode").checked
-    let maxKeyframes = 5
+    let lerp = document.getElementById("lerpmode-select").value
     let segments = []
     for (let i = 0; i < sortedKeyframes.length; i += maxKeyframes - 1) {
         let segment = sortedKeyframes.slice(i, i + maxKeyframes)
@@ -148,6 +149,24 @@ function genSegmentedCode() {
         for (let nodeName of Object.keys(nodeData)) {
             let timeline = []
             let previousNode = null
+            let hasChanged = false
+            for (let keyframe of sortedKeyframes) {
+                let node = keyframe.data[nodeName]
+                if (!node) continue
+                if (previousNode) {
+                    let positionChanged = node.position.x !== previousNode.position.x || node.position.y !== previousNode.position.y || node.position.z !== previousNode.position.z
+                    let rotationChanged = node.rotation.x !== previousNode.rotation.x || node.rotation.y !== previousNode.rotation.y || node.rotation.z !== previousNode.rotation.z
+                    if (positionChanged || rotationChanged) {
+                        hasChanged = true
+                    }
+                }
+                previousNode = node
+            }
+            let firstNode = sortedKeyframes[0]?.data[nodeName]
+            if (!firstNode) continue
+            let firstIsDefault = firstNode.position.x === 0 && firstNode.position.y === 0 && firstNode.position.z === 0 && firstNode.rotation.x === 0 && firstNode.rotation.y === 0 && firstNode.rotation.z === 0
+            if (!hasChanged && firstIsDefault) continue
+            previousNode = null
             for (let keyframe of segment) {
                 let node = keyframe.data[nodeName]
                 if (!node) continue
@@ -166,6 +185,20 @@ function genSegmentedCode() {
                     timeline.push(point)
                 }
                 previousNode = node
+            }
+            for (let point of timeline) {
+                if (point.position && lerp === "catmull-rom-spline") {
+                    point.position = {
+                        point: point.position,
+                        lerpMode: lerp
+                    }
+                }
+                if (point.rotation && lerp === "catmull-rom-spline") {
+                    point.rotation = {
+                        point: point.rotation,
+                        lerpMode: lerp
+                    }
+                }
             }
             if (timeline.length > 0) {
                 nodeAnimations[nodeName] = { timeline }
@@ -698,6 +731,32 @@ var importAnimationCode = (code) => {
         timeline.max = animationLength
         let lastConfig = absoluteAnimations[absoluteAnimations.length - 1].config
         document.getElementById("loop-mode").checked = lastConfig.loop ?? false
+        nodeData = {
+            HeadMesh: {
+                position: { x: 0, y: 0, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 }
+            },
+            TorsoNode: {
+                position: { x: 0, y: 0, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 }
+            },
+            ArmLeftMesh: {
+                position: { x: 0, y: 0, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 }
+            },
+            ArmRightMesh: {
+                position: { x: 0, y: 0, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 }
+            },
+            LegLeftMesh: {
+                position: { x: 0, y: 0, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 }
+            },
+            LegRightMesh: {
+                position: { x: 0, y: 0, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 }
+            }
+        }
         keyframes = []
         let nodes = Object.keys(nodeData)
         let times = new Set([0])
@@ -871,51 +930,62 @@ document.getElementById("export-button").onclick = async () => {
         }
     } else {
         let exportKeyframes = keyframes.filter(keyframe => keyframe.time <= animL)
-        let firstData = exportKeyframes[0]?.data
         for (let nodeName in nodeData) {
             let timeline = []
             let previousNode = null
-            for (let keyframe of keyframes.filter(keyframe => keyframe.time <= animL)) {
+            let hasChanged = false
+            for (let keyframe of exportKeyframes) {
                 let node = keyframe.data[nodeName]
                 if (!node) continue
-                let point = { timeFraction: animL === 0 ? 0 : keyframe.time / animL }
+                if (previousNode) {
+                    let positionChanged = node.position.x !== previousNode.position.x || node.position.y !== previousNode.position.y || node.position.z !== previousNode.position.z
+                    let rotationChanged = node.rotation.x !== previousNode.rotation.x || node.rotation.y !== previousNode.rotation.y || node.rotation.z !== previousNode.rotation.z
+                    if (positionChanged || rotationChanged) {
+                        hasChanged = true
+                    }
+                }
+                previousNode = node
+            }
+            let firstNode = exportKeyframes[0]?.data[nodeName]
+            if (!firstNode) continue
+            let firstIsDefault = firstNode.position.x === 0 && firstNode.position.y === 0 && firstNode.position.z === 0 && firstNode.rotation.x === 0 && firstNode.rotation.y === 0 && firstNode.rotation.z === 0
+            if (!hasChanged && firstIsDefault) continue
+            previousNode = null
+            for (let keyframe of exportKeyframes) {
+                let node = keyframe.data[nodeName]
+                if (!node) continue
                 let positionChanged = !previousNode || node.position.x !== previousNode.position.x || node.position.y !== previousNode.position.y || node.position.z !== previousNode.position.z
                 let rotationChanged = !previousNode || node.rotation.x !== previousNode.rotation.x || node.rotation.y !== previousNode.rotation.y || node.rotation.z !== previousNode.rotation.z
-                if (positionChanged) {
-                    point.position = [round(node.position.x), round(node.position.y), round(-node.position.z)]
-                }
-                if (rotationChanged) {
-                    point.rotation = [round(node.rotation.x * Math.PI / 180), round(node.rotation.y * Math.PI / 180), round(node.rotation.z * Math.PI / 180)]
-                }
                 if (positionChanged || rotationChanged) {
+                    let point = {
+                        timeFraction: animL === 0 ? 0 : Number((keyframe.time / animL).toFixed(6))
+                    }
+                    if (positionChanged) {
+                        point.position = [round(node.position.x), round(node.position.y), round(-node.position.z)]
+                    }
+                    if (rotationChanged) {
+                        point.rotation = [round(node.rotation.x * Math.PI / 180), round(node.rotation.y * Math.PI / 180), round(node.rotation.z * Math.PI / 180)]
+                    }
                     timeline.push(point)
                 }
                 previousNode = node
             }
-            if (timeline.length > 0 && firstData) {
-                let hasChanged = false
-                for (let keyframe of keyframes.filter(keyframe => keyframe.time <= animL)) {
-                    let node = keyframe.data[nodeName]
-                    let firstNode = firstData[nodeName]
-                    if (node.position.x !== firstNode.position.x || node.position.y !== firstNode.position.y || node.position.z !== firstNode.position.z || node.rotation.x !== firstNode.rotation.x || node.rotation.y !== firstNode.rotation.y || node.rotation.z !== firstNode.rotation.z) { hasChanged = true; break }
-                }
-                let firstNode = firstData[nodeName]
-                let firstIsDefault = firstNode.position.x === 0 && firstNode.position.y === 0 && firstNode.position.z === 0 && firstNode.rotation.x === 0 && firstNode.rotation.y === 0 && firstNode.rotation.z === 0
-                if (hasChanged || !firstIsDefault) {
-                    for (let point of timeline) {
-                        if (point.position) {
-                            if (point.position[0] === 0 && point.position[1] === 0 && point.position[2] === 0) {
-                                delete point.position
-                            } else if (lerp === "catmull-rom-spline") {
-                                point.position = { point: point.position, lerpMode: lerp }
-                            }
-                        }
-                        if (point.rotation && lerp === "catmull-rom-spline") {
-                            point.rotation = { point: point.rotation, lerpMode: lerp }
-                        }
+            for (let point of timeline) {
+                if (point.position && lerp === "catmull-rom-spline") {
+                    point.position = {
+                        point: point.position,
+                        lerpMode: lerp
                     }
-                    animConfig.nodeAnimations[nodeName] = { timeline }
                 }
+                if (point.rotation && lerp === "catmull-rom-spline") {
+                    point.rotation = {
+                        point: point.rotation,
+                        lerpMode: lerp
+                    }
+                }
+            }
+            if (timeline.length > 0) {
+                animConfig.nodeAnimations[nodeName] = { timeline }
             }
         }
     }
@@ -1118,10 +1188,10 @@ input.addEventListener('input', function () {
     this.value = this.value.replace(/[^a-zA-Z_0-9 ]/g, '')
 })
 
-window.addEventListener("beforeunload", event => {
+/*window.addEventListener("beforeunload", event => {
     event.preventDefault()
     event.returnValue = ""
-})
+})*/
 
 document.getElementById("import-code-button").onclick = () => {
     showPopup(true, "Import Animation Code", "Paste your api.animateEntity code below.", "", true)
