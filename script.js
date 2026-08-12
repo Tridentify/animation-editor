@@ -583,6 +583,21 @@ var importBase64 = (base64) => {
     }
 }
 
+function evalMathThing(code) {
+    return code.replace(
+        /(?<!["\w.])((?:[-+]?\s*)?(?:Math\.PI|\d+(?:\.\d+)?)\s*(?:(?:\*\*|[+\-*/])\s*(?:[-+]?\s*)?(?:Math\.PI|\d+(?:\.\d+)?))*)(?!["\w])/g,
+        match => {
+            try {
+                let expression = match.replace(/Math\.PI/g, Math.PI)
+                if (!/^[0-9eE+\-*/().\s]+$/.test(expression)) {
+                    return match
+                }
+                return String(Function(`"use strict"; return (${expression})`)())
+            } catch { return match }
+        }
+    )
+}
+
 var importAnimationCode = (code) => {
     try {
         code = code.trim()
@@ -626,6 +641,8 @@ var importAnimationCode = (code) => {
                 return
             }
             let configString = code.slice(jsonStart, jsonEnd)
+            configString = configString.replace(/([{,]\s*)([A-Za-z_$][\w$]*)(\s*:)/g, '$1"$2"$3').replace(/,\s*([}\]])/g, "$1").replace(/([:\[,]\s*)\+(\d+(?:\.\d+)?)/g, "$1$2")
+            configString = evalMathThing(configString)
             let config = JSON.parse(configString)
             let afterConfig = code.slice(jsonEnd)
             let speedMatch = afterConfig.match(/^\s*,\s*0\s*,\s*([^)]+)\)/)
@@ -1101,10 +1118,10 @@ input.addEventListener('input', function () {
     this.value = this.value.replace(/[^a-zA-Z_0-9 ]/g, '')
 })
 
-/*window.addEventListener("beforeunload", event => {
+window.addEventListener("beforeunload", event => {
     event.preventDefault()
     event.returnValue = ""
-})*/
+})
 
 document.getElementById("import-code-button").onclick = () => {
     showPopup(true, "Import Animation Code", "Paste your api.animateEntity code below.", "", true)
